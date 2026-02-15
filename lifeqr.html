@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LifeQR | Akıllı Sağlık Bilekliği</title>
+    <style>
+        :root {
+            --primary: #2c3e50;
+            --accent: #e74c3c;
+            --success: #27ae60;
+            --light: #f5f6fa;
+            --white: #ffffff;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--light);
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .container { width: 100%; max-width: 400px; padding: 20px; }
+        .card {
+            background: var(--white);
+            padding: 30px;
+            border-radius: 24px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+            display: none;
+            animation: slideUp 0.5s ease-out;
+        }
+        .active { display: block; }
+        h2 { text-align: center; color: var(--primary); margin-bottom: 10px; font-size: 24px; }
+        p { text-align: center; color: #7f8c8d; font-size: 14px; margin-bottom: 25px; line-height: 1.5; }
+        input, textarea {
+            width: 100%;
+            padding: 14px;
+            margin-bottom: 15px;
+            border: 2px solid #edf2f7;
+            border-radius: 12px;
+            font-size: 16px;
+            box-sizing: border-box;
+            transition: border-color 0.3s;
+        }
+        input:focus { border-color: var(--primary); outline: none; }
+        #activationInput {
+            font-size: 22px;
+            letter-spacing: 4px;
+            text-align: center;
+            font-weight: bold;
+            color: var(--accent);
+        }
+        button {
+            width: 100%;
+            padding: 16px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .btn-primary { background: var(--primary); color: var(--white); }
+        .btn-success { background: var(--success); color: var(--white); }
+        .btn-call { background: #2980b9; color: var(--white); margin-top: 15px; }
+        button:hover { opacity: 0.9; transform: translateY(-2px); }
+        .info-box {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 12px;
+            margin-bottom: 12px;
+            border-left: 5px solid var(--accent);
+        }
+        .info-label { font-size: 11px; font-weight: bold; color: #95a5a6; text-transform: uppercase; }
+        .info-value { display: block; font-size: 17px; color: var(--primary); margin-top: 5px; font-weight: 500; }
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div id="page-auth" class="card active">
+        <h2>Hoş Geldiniz</h2>
+        <p>Devam etmek için bilekliğinizdeki 11 haneli şahsi aktivasyon kodunu giriniz.</p>
+        <input type="text" id="activationInput" maxlength="11" placeholder="00000000000" oninput="this.value = this.value.replace(/[^0-9]/g, '')">
+        <button class="btn-primary" onclick="verifyActivation()">Giriş Yap</button>
+    </div>
+
+    <div id="page-register" class="card">
+        <h2>Profil Oluştur</h2>
+        <p>Bu kod için henüz bir kayıt bulunamadı. Lütfen bilgilerinizi eksiksiz doldurun.</p>
+        <input type="text" id="reg-name" placeholder="Adınız ve Soyadınız">
+        <input type="text" id="reg-blood" placeholder="Kan Grubunuz (Örn: 0 Rh+)">
+        <textarea id="reg-notes" placeholder="Alerjiler, Kronik Hastalıklar, İlaçlar..." rows="3"></textarea>
+        <input type="tel" id="reg-phone" placeholder="Acil Durum Yakını Telefonu">
+        <button class="btn-success" onclick="completeRegistration()">Kaydı Tamamla ve Aktif Et</button>
+    </div>
+
+    <div id="page-profile" class="card">
+        <h2 style="color: var(--accent);">ACİL DURUM PROFİLİ</h2>
+        <p id="display-id" style="font-family: monospace; color: #bdc3c7;"></p>
+
+        <div class="info-box">
+            <span class="info-label">Ad Soyad</span>
+            <span class="info-value" id="val-name"></span>
+        </div>
+        <div class="info-box">
+            <span class="info-label">Kan Grubu</span>
+            <span class="info-value" id="val-blood"></span>
+        </div>
+        <div class="info-box">
+            <span class="info-label">Kritik Sağlık Notları</span>
+            <span class="info-value" id="val-notes"></span>
+        </div>
+
+        <button class="btn-call" id="call-action">📞 Acil Durum Yakınını Ara</button>
+        <button onclick="location.reload()" style="background:none; color:#ccc; border:none; margin-top:15px; font-size:12px;">Güvenli Çıkış</button>
+    </div>
+</div>
+
+<script>
+let activeCode = "";
+function navigate(pageId) {
+    document.querySelectorAll('.card').forEach(card => card.classList.remove('active'));
+    document.getElementById(pageId).classList.add('active');
+}
+function verifyActivation() {
+    const input = document.getElementById('activationInput').value;
+    if (input.length !== 11) {
+        alert("Lütfen 11 haneli kodun tamamını giriniz.");
+        return;
+    }
+    activeCode = input;
+    const storedUser = localStorage.getItem("lifeqr_" + activeCode);
+    if (storedUser) {
+        loadProfile(JSON.parse(storedUser));
+        navigate('page-profile');
+    } else {
+        navigate('page-register');
+    }
+}
+function completeRegistration() {
+    const userObj = {
+        name: document.getElementById('reg-name').value.trim(),
+        blood: document.getElementById('reg-blood').value.trim(),
+        notes: document.getElementById('reg-notes').value.trim(),
+        phone: document.getElementById('reg-phone').value.trim()
+    };
+    if (!userObj.name || !userObj.phone) {
+        alert("Lütfen adınızı ve acil durum numarasını doldurunuz.");
+        return;
+    }
+    localStorage.setItem("lifeqr_" + activeCode, JSON.stringify(userObj));
+    loadProfile(userObj);
+    navigate('page-profile');
+    alert("Profiliniz başarıyla oluşturuldu!");
+}
+function loadProfile(data) {
+    document.getElementById('display-id').innerText = "Cihaz ID: " + activeCode;
+    document.getElementById('val-name').innerText = data.name;
+    document.getElementById('val-blood').innerText = data.blood || "Belirtilmemiş";
+    document.getElementById('val-notes').innerText = data.notes || "Kayıtlı not bulunmamaktadır.";
+    document.getElementById('call-action').onclick = function() {
+        window.location.href = "tel:" + data.phone;
+    };
+}
+</script>
+</body>
+</html>
